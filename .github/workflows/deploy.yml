@@ -1,0 +1,66 @@
+name: Deploy All React Apps (pnpm)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        app:
+          - path: frontend
+            target: /var/www/frontend
+          - path: grantthrive-admin-dashboard
+            target: /var/www/admin
+          - path: grantthrive-mapping-component
+            target: /var/www/mapping
+          - path: grantthrive-marketing-website
+            target: /var/www/marketing
+          - path: grantthrive-roi-calculator
+            target: /var/www/roi
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install & Build
+        working-directory: ${{ matrix.app.path }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          BUILD_DIR="build"
+          if [ -d "${{ matrix.app.path }}/dist" ]; then
+            BUILD_DIR="dist"
+          fi
+
+          rsync -avz --delete \
+            ${{ matrix.app.path }}/$BUILD_DIR/ \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ matrix.app.target }}
+
+      - name: Reload Nginx
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "sudo systemctl reload nginx"
