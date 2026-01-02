@@ -33,7 +33,6 @@ jobs:
         working-directory: ${{ matrix.app.path }}
         run: |
           npm install --force
-          npm ci
           npm run build
 
       - name: Setup SSH
