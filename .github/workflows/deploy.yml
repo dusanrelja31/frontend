@@ -1,4 +1,4 @@
-name: Deploy All React Apps (pnpm)
+name: Deploy All React Apps
 
 on:
   push:
@@ -23,24 +23,18 @@ jobs:
             target: /var/www/roi
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
 
       - name: Install & Build
         working-directory: ${{ matrix.app.path }}
         run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+          npm install --force
+          npm ci
+          npm run build
 
       - name: Setup SSH
         run: |
@@ -49,7 +43,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
+      - name: Deploy
         run: |
           BUILD_DIR="build"
           if [ -d "${{ matrix.app.path }}/dist" ]; then
